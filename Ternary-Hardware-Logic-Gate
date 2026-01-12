@@ -1,0 +1,70 @@
+Engineering Spec: Ternary Hardware-Logic Gate
+
+Core Principle
+
+The system replaces a shared L1/L2 cache hierarchy with a physically state-gated fabric. No execution domain shares writable memory with another. Continuity is achieved through orientation, not retention.
+1. Memory Map & State Separation
+Physical memory is partitioned using seL4 capabilities into three non-overlapping, hardware-enforced domains.
+Domain
+Access Level
+Hardware
+Persistence
+State −1 (Vault)
+Read-Only (Root-of-Trust / M-mode)
+STT-MRAM
+Permanent (PUF-Anchored)
+State 0 (Airlock)
+Shared, NX (EL2)
+FPGA Block RAM
+Cycle-Volatile (≤500 ms)
+State +1 (Reasoning)
+RW/X (EL1)
+LPDDR6-PIM
+Ephemeral (Hinge-Wiped)
+State −1 contains immutable invariants only. No execution.
+State 0 is the only shared surface between domains.
+State +1 is the sole execution environment for AI inference.
+No capability exists that allows a writable mapping across domains.
+2. The 64-Byte “Mini-Rail” (Orientation Bus)
+The system does not persist tokens, KV cache, or activations.
+Instead:
+At the end of each execution cycle, State 0 stores a 64-byte SHA-3 hash derived from the terminal hidden-layer activation of the reasoning model.
+This hash represents an orientation vector, not semantic content.
+On the next cycle, the hash is injected as a seed bias during model initialization.
+Effect:
+The model does not replay prior text.
+The model re-derives reasoning trajectories from invariant constraints.
+Continuity emerges mathematically, not narratively.
+The orientation hashes form a directed acyclic graph. No linear history exists.
+3. The Hinge Mechanism (Atomic State Revocation)
+The Hinge is implemented as a highest-priority FIQ controlled by the RISC-V Root of Trust.
+Cycle timing:
+T = 0 ms — Execution begins in State +1.
+T = 495 ms — State 0 checkpoints the 64-byte orientation hash.
+T = 500 ms — Crowbar circuit asserts:
+VDD_RED rail pulled to ground
+TLB invalidated
+NPU scratchpads hardware-zeroed
+T = 501 ms — Power restored, State +1 cold-boots.
+No software path exists to defer or bypass the Hinge.
+4. UCIe 3.0 “Weld” (Fabric Policy)
+Inter-chip communication uses UCIe 3.0 with a custom Fabric Manager enforcing Unidirectional Data Flow (UDF).
+Direction
+Policy
+Blue (Vault) → Purple (Airlock)
+Allowed (Encrypted Invariants)
+Purple → Red (Reasoning)
+Allowed (Orientation Seeds)
+Red → Blue
+HARD-DROP
+Any packet originating from the AI NPU that attempts to address the MRAM range triggers:
+Physical-layer exception
+Immediate NPU power-cycle
+This enforcement occurs below the software stack.
+5. Implementation Stack (Butterfly-1)
+Kernel: seL4 v14.0.0 (Verified Rust Microkit)
+AI Runtime: ternary-llama.cpp (BitNet b1.58 quantization)
+Root of Trust: RISC-V OpenTitan managing PUF-derived key injection
+In Ternary-OS, you do not write memory; you emit orientation.
+You do not manage a process; you supervise a bounded rebirth cycle.
+Every 500 ms the execution state is destroyed, and only the invariant survives.
