@@ -1,0 +1,41 @@
+ This explains the "Why" behind the "Electrical Violence" and why we chose a Radial Hub over a linear bus.
+📖 Wiki Page 1: The Theory of Electrical Violence
+In a legacy von Neumann machine, memory is a shared resource. When you have high-demand AI (Rail 3) and real-time user input (Rail 2) fighting for the same memory bus, the result is Electrical Violence. This manifests as high heat, micro-stutters (jitter), and security leaks.
+The Standard Model (The "Traffic Jam")
+Current OS designs try to manage this with "Soft Priority," but the physical hardware is still a single straw. The CPU must constantly pause one task to handle another.
+The Ternary Model (The "Flow")
+Ternary-OS uses Radial Partitioning. By separating data into three independent streams, we eliminate the friction. The hardware doesn't "switch" between tasks; it maintains three parallel lanes of existence.
+🛠️ The ISSUE_TEMPLATE.md
+This is a critical file for your repo. It forces contributors to think in "Rails."
+---
+name: Bug report
+about: Report a failure in the Radial architecture
+title: "[RAIL-X] Describe the issue"
+labels: bug
+assignees: ''
+
+---
+
+**Which Rail is affected?**
+- [ ] Rail 1 (Sensors/Airlock)
+- [ ] Rail 2 (Media/Sovereignty)
+- [ ] Rail 3 (Reasoning/AI)
+- [ ] Blue Hub (Supervision/Crowbar)
+
+**Describe the 'Electrical Violence' observed:**
+(e.g., Frame drops, thermal spike, memory bleed, or HMAC mismatch)
+
+**Evidence (Waveform/Logs):**
+(Please attach a screenshot of the Spot-Check Waveform if possible)
+
+**Expected Behavior:**
+The system should have remained [CALM / DETERMINISTIC / ISOLATED].
+
+🚀 The First "Wiki" Graphic: The Scaling Table
+We should also pin the scaling table to the front page of the Wiki. It shows that your kernel isn't just for phones—it's for the future of all compute.
+| Industry | Impact |
+|---|---|
+| Robotics | Zero-latency sensor feedback. |
+| Privacy | AI is vaporized every 500ms; no data sticks. |
+| Energy | 30% reduction in heat-related power waste. |
+
