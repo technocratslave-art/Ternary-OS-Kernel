@@ -1,0 +1,317 @@
+0. ROOT
+
+README.md
+Purpose, threat model, and invariants. One page. No fluff.
+
+What Ternary-OS is (and is not)
+
+Non-goals (no learning, no personalization, no cloud dependency)
+
+The Three Invariants (Soul, Breath, Bridge)
+
+Link to Constitution
+
+Link to Hardware Reference
+
+Release tag + hash
+
+
+
+
+1. CONSTITUTION
+
+/constitution/TERNARY_OS_CONSTITUTION.md
+
+This is the law. Everything else must conform.
+
+Subsections:
+
+1. Immutable Soul
+
+
+2. Ephemeral Breath
+
+
+3. Sterile Bridge
+
+
+4. Physical Enforcement
+
+
+5. Violation Conditions (what constitutes a broken system)
+
+
+
+No implementation details here—only rules.
+
+
+
+2. ARCHITECTURE SPINE
+
+/docs/architecture/ARCHITECTURE_OVERVIEW.md
+
+This explains how the laws are obeyed.
+
+Subsections:
+
+Rail Model Overview (Rail-1 / Rail-2 / Rail-3 / State-0)
+
+Power Domains & Physical Isolation
+
+Dataflow Diagram (Sensors → Airlock → Reasoning → Airlock → UI)
+
+What can never talk to what (explicit deny table)
+
+
+This is where diagrams live.
+
+
+
+3. MEMORY MODEL
+
+/docs/architecture/MEMORY_MODEL.md
+
+Defines what exists and how long it may exist.
+
+Subsections:
+
+Immutable Memory (Weights, Centroid Dictionary)
+
+Ephemeral Memory (KV Cache, Scratch, Activations)
+
+Scar Capsule (allowed payload, max size, lifecycle)
+
+Forbidden Memory (examples)
+
+
+This is the anti-ego section.
+
+
+4. THE HINGE
+
+/docs/architecture/HINGE_ENFORCEMENT.md
+
+The heart of the system.
+
+Subsections:
+
+Electrical Definition of the Hinge
+
+500ms Timer Source
+
+SRAM Discharge Requirements
+
+What is wiped vs what remains powered
+
+Verification methodology (how to prove it happened)
+
+
+No metaphors here—only physics.
+
+
+
+5. SCAR CAPSULE
+
+/docs/scar/SCAR_CAPSULE_SPEC.md
+
+Defines the only state allowed to cross death.
+
+Subsections:
+
+Allowed Data Types (Concept IDs only)
+
+Explicitly Forbidden Data
+
+Size Limits
+
+Signing & Verification (State-0)
+
+Replay & Tamper Rejection
+
+
+This should read like a crypto spec.
+
+
+6. CENTROID DICTIONARY
+
+/docs/scar/CENTROID_DICTIONARY.md
+
+Your appendix, formalized.
+
+Subsections:
+
+Derivation Corpus & Rationale
+
+Clustering Method (k-means, dimensionality, k)
+
+Frozen Invariant Policy
+
+Collision & Ambiguity Strategy
+
+Hashing & Attestation (optional v1.1 note)
+
+
+This is where “facts without vibe” is mathematically enforced.
+
+
+
+7. KV POLICY (FACT EXTRACTION)
+
+/docs/runtime/KV_POLICY.md
+
+Explains how facts are extracted before death.
+
+Subsections:
+
+Topic Head Selection
+
+Stability Window
+
+Cross-Head Consensus
+
+Style Probe Rejection
+
+Discretization Pipeline
+
+Failure Modes (when nothing survives)
+
+
+Reference kv_policy.c here—don’t duplicate code.
+
+
+
+8. RUNTIME (RAIL-3)
+
+/runtime/rail3/
+
+Code, not philosophy.
+
+Files:
+
+rail3_runtime.c
+
+ternary_npu.h
+
+ternary_sw_backend.c
+
+hinge_state.h
+
+
+README in this folder:
+
+Execution lifecycle
+
+Where the hinge fires
+
+What must be zero after each cycle
+
+
+
+9. AIRLOCK (STATE-0)
+
+/runtime/airlock/
+
+Governance and enforcement.
+
+Subsections (README):
+
+Validation Rules
+
+Scar Signing
+
+Dictionary Verification
+
+Drop Conditions (silent discard rules)
+
+
+This is the judge, not a participant.
+
+
+
+10. HARDWARE REFERENCE
+
+/hardware/REFERENCE_DESIGN.md
+
+Bench-buildable, not aspirational.
+
+Subsections:
+
+Rail Mapping to Physical Components
+
+Power Domains
+
+Reset Lines
+
+Clock Sources
+
+What cannot be shared
+
+
+
+11. PROTOTYPE BOM
+
+/hardware/PROTOTYPE_BOM.md
+
+Your existing list, cleaned and frozen.
+
+Subsections:
+
+Core Hardware
+
+Measurement Equipment
+
+Why each item exists (one line each)
+
+
+
+12. TEST & AUDIT
+
+/tests/SOVEREIGN_AUDIT.md
+
+Proof, not promises.
+
+Subsections:
+
+Hinge Wipe Test
+
+Needle Injection Test
+
+Reconstruction Attack Test
+
+Thermal & Bandwidth Limits
+
+Pass/Fail Criteria
+
+
+If a test fails, the system is not sovereign.
+
+
+
+13. RELEASE LOCK
+
+/RELEASE.md
+
+Version tag
+
+Git commit hash
+
+Constitution hash
+
+Centroid dictionary hash
+
+Signed statement of invariants
+
+
+This is the notarization page.
+
+
+Final Note
+
+This spine does one critical thing:
+it separates law, physics, and code.
+
+Law cannot be “optimized.”
+
+Physics cannot be “patched.”
+
+Code is disposable as long as it obeys both.
