@@ -1,0 +1,73 @@
+## 3-Rail Radial Isolation Topology (Endgame Anchor)
+
+This diagram is the *endgame anchor* of the project: the kernel is not a bridge to “everywhere.”  
+It is a *hub* that enforces deterministic doors.
+
+### The Hub (Blue)
+The Blue Hub is the trusted authority plane. It is intentionally small and boring.
+
+It owns:
+- identity and keys
+- invariant sets (“needles”)
+- audit root / append-only events
+- capability minting + revocation
+- hinge control (reset policy, restart authority)
+
+If a component cannot be expressed as a capability with a bounded contract, it does not belong in the hub.
+
+### The Rails (Untrusted Domains)
+The outer rings are rails: separate execution + I/O domains that can run rich stacks and still be treated as compromised.
+
+**Rail 1 — Sensor Rail**
+- camera / mic / GPS / IMU / biometrics ingress
+- never gets a direct path to reasoning or identity
+- data must cross the Sensor Airlock (State 0) for downgrade, rate limits, timestamping, and policy transforms
+
+**Rail 2 — Media Rail**
+- GPU, display, video, audio pipelines
+- designed for “zero-copy” passthrough where possible (capability-controlled DMA mappings)
+- all bridges to identity, storage, or reasoning must cross the Media Airlock (State 0)
+
+**Rail 3 — Reasoning Rail**
+- optional LLM/agent workloads live here
+- treated as untrusted by default (jailbreaks, hostile documents, prompt injection are assumed)
+- receives only bounded artifacts through the Reasoning Airlock (State 0)
+
+The rails can be powerful. They are not authoritative.
+
+### The Airlocks (Purple)
+Airlocks are the only legal bridges between domains.
+
+An Airlock is a State-0 component with hard requirements:
+- non-executable shared window (or minimal gate code with no allocation)
+- fixed-size buffers
+- deterministic runtime (bounded time, bounded memory)
+- explicit result codes: ALLOW / REDACT / VIOLATION
+- explicit output locations and lifetimes
+
+Airlocks exist to prevent “convenience tunnels” from slowly becoming the real system.
+
+### Bay-0 (Control Plane)
+Bay-0 is the non-performing observer/orchestrator role:
+- no heavy compute
+- no learning
+- no context accumulation
+- budgets, orchestration, and kill/restart authority routing
+
+Bay-0 exists to keep the rails from growing into a shadow OS.
+
+### The Hinge (Temporal Discontinuity)
+The hinge is scheduled discontinuity:
+- rail memory is flushed/restarted on policy or clock
+- caches and scratch state are destroyed
+- compromised domains lose continuity
+
+This converts long-lived compromise into short-lived compromise.
+
+### The Scar (Continuity Without Accumulation)
+If the reasoning rail needs orientation across hinge cycles, it does not receive full history.
+
+It receives a bounded continuity artifact (“scar”), e.g. a fixed 64-byte authenticated hash output,
+sufficient to re-orient the next cycle without carrying raw context forward.
+
+Memory is transient. Continuity is hashed.
