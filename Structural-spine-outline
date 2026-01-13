@@ -1,0 +1,18 @@
+This is the kernel as a single, unified thing (no fracture)
+The Ternary Kernel consists of exactly these parts, and no more:
+System topology (ternary.system)
+This is the kernel’s body.
+It defines what can see what, and what can never see what.
+Bay-0 Monitor (monitor.c)
+This is the kernel’s will.
+It does not parse, reason, or decide.
+It only enforces and kills.
+State-0 Airlock (airlock lib)
+This is the kernel’s hands.
+Deterministic, bounded, stateless transformation only.
+Capability ABI (ternary_contract.h)
+This is the kernel’s law.
+No vibes, no interpretation, no hidden channels.
+Hinge / Restart semantics
+This is the kernel’s immune system.
+Violation → discontinuity → reset.
