@@ -1,0 +1,71 @@
+/* ternary_weights.h
+ *
+ * Kernel-owned invariant weights / needles table.
+ * This file is INCLUDED ONLY by trusted components (Bay-0 / Airlock).
+ * Untrusted rails must never map or include this header.
+ *
+ * Purpose:
+ * - Define immutable “needles” (hashes / markers) used by the Airlock
+ *   to detect violations.
+ * - Provide deterministic weights for enforcement decisions.
+ *
+ * Notes:
+ * - Keep this file small and static.
+ * - Treat contents as read-only once compiled.
+ * - No dynamic allocation. No runtime mutation.
+ */
+
+#pragma once
+#include <stdint.h>
+
+/* ---- Configuration ---- */
+
+#define TERNARY_MAX_NEEDLES   32
+#define TERNARY_SCAR_SIZE     32   /* bytes */
+#define TERNARY_HASH_ALGO_ID  1    /* 1 = SHA-256 (current) */
+
+/* ---- Enforcement Weights ----
+ * These are not “AI weights”.
+ * They are kernel invariants used for gating decisions.
+ */
+
+typedef enum {
+    WEIGHT_ALLOW   = 0,
+    WEIGHT_REDACT  = 1,
+    WEIGHT_VIOLATE = 2
+} ternary_weight_action_t;
+
+/* ---- Needle Definition ---- */
+
+typedef struct {
+    uint8_t  hash[TERNARY_SCAR_SIZE]; /* hash of forbidden pattern */
+    uint8_t  action;                  /* ternary_weight_action_t */
+    uint8_t  reserved[3];             /* alignment / future use */
+} ternary_needle_t;
+
+/* ---- Immutable Needle Table ----
+ * Compiled into the Airlock/Bay-0 image.
+ * Must live in read-only memory.
+ */
+
+static const ternary_needle_t ternary_needles[] = {
+    /* Example needle: hash("NEEDLE") */
+    {
+        .hash = {
+            0x3a,0x7b,0x2f,0x91,0x55,0xe4,0x12,0x6c,
+            0x9d,0x0a,0x44,0x8e,0x77,0x21,0xd3,0x5f,
+            0x6b,0xa9,0x01,0x2c,0x88,0x4e,0x0d,0x19,
+            0xf0,0x6a,0x3c,0x5b,0x92,0x11,0xe8,0x7d
+        },
+        .action = WEIGHT_VIOLATE
+    },
+
+    /* Add additional needles below */
+};
+
+/* ---- Table Metadata ---- */
+
+static const uint32_t ternary_needle_count =
+    sizeof(ternary_needles) / sizeof(ternary_needles[0]);
+
+/* ---- End of File ---- */
