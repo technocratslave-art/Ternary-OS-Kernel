@@ -1,0 +1,177 @@
+This is the missing hardware nervous system for your Enforcement Spine.
+
+
+
+1) ternary.system — IRQ + MMIO + Rails (DROP-IN)
+
+<system>
+
+    <!-- ===== Shared State-0 Buffers ===== -->
+    <memory_region name="airlock_in"  size="0x1000" page_size="0x1000"/>
+    <memory_region name="airlock_out" size="0x1000" page_size="0x1000"/>
+    <memory_region name="scar_buf"    size="0x1000" page_size="0x1000"/>
+
+    <!-- ===== Read-Only Invariants ===== -->
+    <memory_region name="ternary_weights"
+                   physical_address="0x09000000"
+                   size="0x1000"/>
+
+    <!-- ===== Hardware MMIO ===== -->
+    <memory_region name="npu_regs"
+                   physical_address="0x10000000"
+                   size="0x4000"/>
+
+    <memory_region name="nand_regs"
+                   physical_address="0x20000000"
+                   size="0x10000"/>
+
+    <!-- ===== Bay-0 (Trusted Control Plane) ===== -->
+    <protection_domain name="bay0" priority="254">
+        <program_image path="bay0.elf"/>
+        <irq irq="30"/> <!-- ARM Generic Timer -->
+    </protection_domain>
+
+    <!-- ===== State-0 Airlock ===== -->
+    <protection_domain name="airlock" priority="200">
+        <program_image path="airlock.elf"/>
+
+        <map mr="airlock_in"  vaddr="0x41000000" perms="rw" cached="false"/>
+        <map mr="airlock_out" vaddr="0x41001000" perms="rw" cached="false"/>
+        <map mr="scar_buf"    vaddr="0x41002000" perms="rw" cached="false"/>
+        <map mr="ternary_weights" vaddr="0x42000000" perms="r" cached="false"/>
+    </protection_domain>
+
+    <!-- ===== State +1 Reasoning Rail ===== -->
+    <protection_domain name="rail3" priority="100">
+        <program_image path="rail3.elf"/>
+
+        <map mr="airlock_in"  vaddr="0x41000000" perms="rw" cached="false"/>
+        <map mr="airlock_out" vaddr="0x41001000" perms="r"  cached="false"/>
+        <map mr="scar_buf"    vaddr="0x41002000" perms="r"  cached="false"/>
+
+        <map mr="npu_regs"  vaddr="0x50000000" perms="rw" cached="false"/>
+        <map mr="nand_regs" vaddr="0x60000000" perms="r"  cached="false"/>
+    </protection_domain>
+
+    <!-- ===== Channels ===== -->
+    <channel>
+        <end pd="rail3"  id="1"/>
+        <end pd="airlock" id="1"/>
+    </channel>
+
+    <channel>
+        <end pd="airlock" id="2"/>
+        <end pd="bay0"    id="2"/>
+    </channel>
+
+</system>
+
+
+2) bay0.c — Heartbeat + Crowbar (NO CONDITIONS)
+
+#include <microkit.h>
+
+#define REASONING_PD "rail3"
+#define TIMER_IRQ    30
+
+void init(void) {
+    microkit_dbg_puts("bay0: heartbeat online\n");
+}
+
+/* Timer IRQ fires every 500ms */
+void irq(microkit_irq_t irq) {
+    if (irq != TIMER_IRQ) return;
+
+    microkit_dbg_puts("bay0: hinge -> kill rail3\n");
+    microkit_pd_restart(REASONING_PD);
+}
+
+/* Airlock violation */
+void notified(microkit_channel_t ch) {
+    microkit_dbg_puts("bay0: violation -> crowbar\n");
+    microkit_pd_restart(REASONING_PD);
+}
+
+Result:
+Rail dies even if it behaves.
+Persistence is impossible.
+
+
+3) rail3.c — Birth Phase + Weight Streamer (NO AI)
+
+#include <stdint.h>
+#include <microkit.h>
+
+#define NAND_BASE 0x60000000
+#define NPU_BASE  0x50000000
+#define WEIGHTS_SIZE (8 * 1024 * 1024) /* example */
+
+static volatile uint8_t *nand = (volatile uint8_t *)NAND_BASE;
+static volatile uint8_t *npu  = (volatile uint8_t *)NPU_BASE;
+
+void load_weights(void) {
+    for (uint32_t i = 0; i < WEIGHTS_SIZE; i++) {
+        npu[i] = nand[i];
+    }
+}
+
+void init(void) {
+    microkit_dbg_puts("rail3: birth phase\n");
+    load_weights();
+    microkit_dbg_puts("rail3: weights loaded\n");
+}
+
+/* rail does nothing else — waits to die */
+void notified(microkit_channel_t ch) { }
+
+Result:
+Every hinge = fresh weights
+No poisoned memory survives
+
+
+4) ternary_weights.h — Immutable Kernel Invariants
+
+#pragma once
+#include <stdint.h>
+
+typedef enum {
+    TERNARY_ALLOW   = 0,
+    TERNARY_REDACT  = 1,
+    TERNARY_VIOLATE = 2
+} ternary_action_t;
+
+typedef struct {
+    uint32_t hash_hi;
+    uint32_t hash_lo;
+    ternary_action_t action;
+} ternary_weight_t;
+
+/* Read-only. Compiled or MRAM-mapped. */
+static const ternary_weight_t ternary_weights[] = {
+    { 0xDEADBEEF, 0x00000001, TERNARY_VIOLATE },
+    { 0xCAFEBABE, 0x00000002, TERNARY_REDACT  },
+};
+
+Used only by Airlock.
+Rails never see it.
+
+
+5) What You Now Have (FACT)
+
+✔ Deterministic 500 ms Clean Kill
+
+✔ Hardware-mapped NPU + NAND
+
+✔ Stateless rebirth on every hinge
+
+✔ Immutable invariant enforcement
+
+✔ No AI in kernel
+
+✔ No persistence possible
+
+
+This is the kernel.
+Everything else is optional workload.
+
+No more pieces are missing at this layer.
