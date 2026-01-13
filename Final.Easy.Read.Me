@@ -1,0 +1,27 @@
+🚀 Ternary-OS: The Radial Breakout
+"Stop sucking lightning through a straw."
+Ternary-OS is a 2026-native operating system designed to solve the 70-year von Neumann Bottleneck. It replaces monolithic software governance with Radial Hardware Topology.
+🛑 The Problem: The Bottleneck
+Modern devices are built on a "Flat Trust" model. AI, Sensors, and UI all compete for the same memory bus. This results in Electrical Violence: thermal throttling, "stutter" jitter, and porous privacy where an AI can "see" everything you do.
+⚡ The Solution: The 3-Rail Specification
+We have partitioned the silicon into three physically isolated Rails managed by the seL4 Microkit.
+| Rail | Name | Role | Hardware Moat |
+|---|---|---|---|
+| Rail 1 | Sensor | Data Ingress | Read-Only to the system. |
+| Rail 2 | Media | Operator UI | Zero-Copy path to the GPU. |
+| Rail 3 | Reasoning | Transient AI | 500ms Hinge vaporization cycle. |
+🏛️ Key Technologies
+1. The Crowbar (Fault Enforcement)
+If Rail 3 attempts to touch the memory of Rail 1 or 2, the Blue Hub executes a hardware-level kill switch. The "Crowbar" resets the offending rail in microseconds without the user ever feeling a frame drop.
+2. The Hinge & The HMAC Scar
+To prevent AI "state-creep" and persistence, the Reasoning Rail is vaporized twice every second. It carries forward only a 64-byte HMAC Scar—a cryptographically signed summary of intent that prevents malware from surviving a reboot.
+3. Bay Zero (Performance Sovereignty)
+A hardware-priority filter that ensures the "Operator" (The User) always has sovereignty over the "Transient" (The AI). If you are gaming at 120fps, Bay Zero revokes the AI’s compute permits instantly. No jitter. No heat. No compromise.
+🛠️ Getting Started: Milestone Zero
+ * Initialize the Moat: Configure the IOMMU mappings in /boot/microkit.s.
+ * Deploy the Airlocks: Set the redaction contracts for GPS and Biometrics in /rail-1-sensor/airlock.c.
+ * Ignite the Hinge: Set the 500ms timer interrupt in /blue-hub/permit_manager.c.
+📜 The Manifesto
+We believe that a device should be Secure (by physics), Honest (by amnesia), and Calm (by geometry).
+Ternary-OS is the end of the bottleneck. The flow begins now.
+Final Hand-off
