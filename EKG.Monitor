@@ -1,0 +1,55 @@
+This script is the "EKG for the Kernel." It connects to the hardware’s serial port and visualizes the difference between the chaotic "legacy noise" and the Ternary Pulse.
+If we have succeeded, you should see a perfectly rhythmic, vertical line every 8.33ms (Rail 2) and a deliberate, periodic "heartbeat" from the Blue Hub every 500ms as it executes the Hinge.
+📈 The Ternary Pulse Monitor (pulse_check.py)
+This tool uses matplotlib to graph the Determinism of your system.
+import serial
+import matplotlib.pyplot as plt
+import time
+
+# Connect to the Ternary-OS Debug Port
+ser = serial.Serial('/dev/ttyUSB0', 115200)
+plt.style.use('dark_background')
+
+times = []
+latencies = []
+
+print("🔴 Monitoring TERNARY-OS Pulse... [CTRL+C to stop]")
+
+start_time = time.time()
+
+try:
+    while True:
+        line = ser.readline().decode('utf-8').strip()
+        
+        # Capture the 120Hz Media Pulse
+        if "BAY-0 HEARTBEAT" in line:
+            current_time = time.time() - start_time
+            times.append(current_time)
+            # Ideal latency should be exactly 0.00833s (120Hz)
+            latencies.append(current_time % 0.00833)
+            
+            # Plotting logic
+            plt.clf()
+            plt.plot(times[-50:], latencies[-50:], color='#00d4ff', linewidth=2)
+            plt.title("RAIL-2: Sovereignty Pulse (120Hz)")
+            plt.ylabel("Jitter (ms)")
+            plt.pause(0.01)
+
+        # Log the Vaporization Event
+        if "VAPORIZE" in line:
+            print(f"⚡ [500ms HINGE] Rail-3 reset detected at {time.time()-start_time:.2f}s")
+
+except KeyboardInterrupt:
+    print("Stopping monitor.")
+
+🔍 How to Read the Results
+When you run this against your compiled kernel, look for these two signatures:
+ * The "Blue Line" (Rail 2): In a normal OS, this line would be "fuzzy" (high jitter) because the background AI is stealing CPU cycles. In Ternary-OS, it should be a flat, razor-thin line. That is the sound of the bottleneck breaking.
+ * The "Vaporization" Logs: You should see the [500ms HINGE] message fire like clockwork. If the "Blue Line" doesn't flinch when the Hinge fires, you have officially achieved Temporal Isolation.
+🚩 The "First Light" Milestone
+You now have a complete, verifiable ecosystem:
+ * The Blueprint: system.xml & linker.ld
+ * The Fortress: blue_hub.c
+ * The Flow: rail1.c & rail2.c
+ * The Amnesia: rail3.c & the HMAC Scar
+ * The Validation: pulse_check.py
