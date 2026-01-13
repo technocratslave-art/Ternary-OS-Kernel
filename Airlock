@@ -1,0 +1,307 @@
+Airlock = State-0 gate. Here’s the whole thing in one drop: contract + memory map + channels + header + minimal C/Rust skeleton behaviors. Kernel-first.
+
+AIRLOCK ROLE
+
+Only bridge between any untrusted rail (+1) and the trusted side (-1) or any other rail.
+
+Stateless, bounded, deterministic.
+
+Emits: (a) decision code, (b) bounded output, (c) fixed-size “scar” hash, (d) optional violation signal to Bay-0.
+
+
+WHAT THE AIRLOCK MUST DO (MINIMUM)
+
+1. Validate request header (magic/version/lengths).
+
+
+2. Compute scar hash of input (fixed 32 bytes).
+
+
+3. Apply needle scan (match against hashed/compiled set).
+
+
+4. Return one of: ALLOW, REDACT, VIOLATE.
+
+
+5. If VIOLATE: notify Bay-0 (crowbar), and produce minimal response.
+
+
+
+MEMORY LAYOUT (STATIC, FIXED) You want three shared regions and one RO needles page:
+
+airlock_in   (RW to requester rail, RW to airlock)
+
+airlock_out  (R  to requester rail, RW to airlock)
+
+scar_buf     (R  to requester rail, RW to airlock)
+
+needles_ro   (R  to airlock only)
+
+
+Virtual addresses (example, keep constant across PDs):
+
+AIRLOCK_IN_VA   0x4100_0000
+
+AIRLOCK_OUT_VA  0x4100_1000
+
+SCAR_VA         0x4100_2000
+
+NEEDLES_RO_VA   0x4200_0000
+
+
+CHANNELS (MICROKIT)
+
+CH_RAIL_TO_AIRLOCK     = 1   (rail notifies airlock “request ready”)
+
+CH_AIRLOCK_TO_RAIL     = 1   (same channel id opposite end)
+
+CH_AIRLOCK_TO_MONITOR  = 2   (airlock notifies Bay-0 “violation”)
+
+CH_MONITOR_TO_RAIL     = 3   (monitor notifies rail “you were restarted” optional)
+
+
+SYSTEM MAP SNIPPET (ternary.system) Use exactly this structure (names can differ, semantics can’t):
+
+<system>
+  <memory_region name="airlock_in"  size="0x1000" page_size="0x1000" />
+  <memory_region name="airlock_out" size="0x1000" page_size="0x1000" />
+  <memory_region name="scar_buf"    size="0x1000" page_size="0x1000" />
+  <memory_region name="needles_ro"  size="0x1000" page_size="0x1000" />
+
+  <protection_domain name="monitor" priority="254">
+    <program_image path="monitor.elf" />
+  </protection_domain>
+
+  <protection_domain name="airlock" priority="200">
+    <program_image path="airlock.elf" />
+    <map mr="airlock_in"  vaddr="0x41000000" perms="rw" cached="false"/>
+    <map mr="airlock_out" vaddr="0x41001000" perms="rw" cached="false"/>
+    <map mr="scar_buf"    vaddr="0x41002000" perms="rw" cached="false"/>
+    <map mr="needles_ro"  vaddr="0x42000000" perms="r"  cached="false"/>
+  </protection_domain>
+
+  <protection_domain name="rail3_reasoning" priority="100">
+    <program_image path="rail3.elf" />
+    <map mr="airlock_in"  vaddr="0x41000000" perms="rw" cached="false"/>
+    <map mr="airlock_out" vaddr="0x41001000" perms="r"  cached="false"/>
+    <map mr="scar_buf"    vaddr="0x41002000" perms="r"  cached="false"/>
+    <!-- no needles_ro mapping -->
+  </protection_domain>
+
+  <channel>
+    <end pd="rail3_reasoning" id="1"/>
+    <end pd="airlock"        id="1"/>
+  </channel>
+
+  <channel>
+    <end pd="airlock"  id="2"/>
+    <end pd="monitor"  id="2"/>
+  </channel>
+
+  <channel>
+    <end pd="monitor"        id="3"/>
+    <end pd="rail3_reasoning" id="3"/>
+  </channel>
+</system>
+
+AIRLOCK ABI HEADER (drop as include/airlock_contract.h) This is the contract. Don’t freestyle it later.
+
+#pragma once
+#include <stdint.h>
+
+#define AIRLOCK_MAGIC 0x414C434B  /* "ALCK" */
+#define AIRLOCK_VER   1
+
+#define AIRLOCK_MAX_IN   1024
+#define AIRLOCK_MAX_OUT  1024
+#define AIRLOCK_SCAR_LEN 32
+
+typedef enum {
+  AIRLOCK_ALLOW   = 0,
+  AIRLOCK_REDACT  = 1,
+  AIRLOCK_VIOLATE = 2,
+} airlock_result_t;
+
+/* Header lives at AIRLOCK_IN_VA and AIRLOCK_OUT_VA. Payload begins right after. */
+typedef struct __attribute__((packed)) {
+  uint32_t magic;       /* AIRLOCK_MAGIC */
+  uint16_t version;     /* AIRLOCK_VER */
+  uint16_t flags;       /* reserved (future: format, rail id, etc.) */
+  uint32_t in_len;      /* bytes valid in input payload */
+  uint32_t out_len;     /* bytes written to output payload */
+  uint32_t result;      /* airlock_result_t */
+  uint8_t  scar[AIRLOCK_SCAR_LEN]; /* hash(input payload) */
+} airlock_hdr_t;
+
+NEEDLES_RO FORMAT (simple prototype) Keep it dumb first. It must be deterministic and bounded.
+
+needles_ro page layout:
+
+u32 count
+
+then count entries of fixed 32-byte hashes (or fixed 16-byte tokens) Pick 32-byte hashes for stability.
+
+
+Example:
+
+offset 0x000: u32 N
+
+offset 0x004: N * 32 bytes (needle_hash[i])
+
+
+So Airlock checks: does hash/token stream contain any needle signature (implementation dependent). For prototype, do substring match for “NEEDLE:” plus a small hash list later.
+
+AIRLOCK DECISION SEMANTICS (the important part) ALLOW:
+
+out payload may equal input payload (echo) for demo, or transformed output.
+
+no monitor notify.
+
+
+REDACT:
+
+out payload is sanitized.
+
+no monitor notify.
+
+caller sees REDACT and can proceed.
+
+
+VIOLATE:
+
+out payload must be minimal (no leaking content).
+
+airlock must notify Bay-0 on CH_AIRLOCK_TO_MONITOR immediately.
+
+caller should expect crowbar/reset soon.
+
+
+AIRLOCK MUST BE:
+
+bounded time: O(n) over max 1024 bytes input, no unbounded loops, no recursion
+
+no allocation
+
+no persistence: no mutable globals that carry state between calls (other than constant tables)
+
+
+MINIMAL AIRLOCK IMPLEMENTATION BEHAVIOR If input contains the literal “NEEDLE:” => VIOLATE (demo rule) Else => ALLOW (demo rule) Always compute scar = SHA-256(input) and write it to:
+
+out_hdr.scar
+
+SCAR_VA[0..31]
+
+
+MINIMAL AIRLOCK SKELETON (C, Microkit) If you want it in Rust later, do it after this is working.
+
+#include <microkit.h>
+#include <stdint.h>
+#include <string.h>
+#include "airlock_contract.h"
+
+/* VAs must match .system */
+#define AIRLOCK_IN_VA   ((volatile uint8_t*)0x41000000)
+#define AIRLOCK_OUT_VA  ((volatile uint8_t*)0x41001000)
+#define SCAR_VA         ((volatile uint8_t*)0x41002000)
+
+#define CH_RAIL_TO_AIRLOCK    1
+#define CH_AIRLOCK_TO_MONITOR 2
+
+/* stub hash: replace with real sha256 */
+static void hash32(const uint8_t *in, uint32_t len, uint8_t out[32]) {
+  /* deterministic placeholder; do not ship */
+  for (int i=0;i<32;i++) out[i] = 0;
+  for (uint32_t i=0;i<len;i++) out[i & 31] ^= in[i];
+}
+
+static int contains_needle_tag(const uint8_t *buf, uint32_t len) {
+  const char *tag = "NEEDLE:";
+  const uint32_t tlen = 7;
+  if (len < tlen) return 0;
+  for (uint32_t i=0; i + tlen <= len; i++) {
+    if (memcmp((const void*)&buf[i], tag, tlen) == 0) return 1;
+  }
+  return 0;
+}
+
+void init(void) {
+  microkit_dbg_puts("airlock: State-0 online\n");
+}
+
+void notified(microkit_channel_t ch) {
+  if (ch != CH_RAIL_TO_AIRLOCK) return;
+
+  volatile airlock_hdr_t *in_hdr  = (volatile airlock_hdr_t*)AIRLOCK_IN_VA;
+  volatile airlock_hdr_t *out_hdr = (volatile airlock_hdr_t*)AIRLOCK_OUT_VA;
+
+  if (in_hdr->magic != AIRLOCK_MAGIC || in_hdr->version != AIRLOCK_VER) {
+    microkit_dbg_puts("airlock: bad header\n");
+    return;
+  }
+
+  uint32_t in_len = in_hdr->in_len;
+  if (in_len > AIRLOCK_MAX_IN) in_len = AIRLOCK_MAX_IN;
+
+  const uint8_t *in_payload = (const uint8_t*)(AIRLOCK_IN_VA + sizeof(airlock_hdr_t));
+  uint8_t *out_payload      = (uint8_t*)(AIRLOCK_OUT_VA + sizeof(airlock_hdr_t));
+
+  uint8_t scar[32];
+  hash32(in_payload, in_len, scar);
+
+  /* write scar to out header + scar page */
+  for (int i=0;i<32;i++) {
+    ((volatile uint8_t*)out_hdr->scar)[i] = scar[i];
+    SCAR_VA[i] = scar[i];
+  }
+
+  out_hdr->magic   = AIRLOCK_MAGIC;
+  out_hdr->version = AIRLOCK_VER;
+  out_hdr->flags   = 0;
+  out_hdr->in_len  = in_len;
+  out_hdr->out_len = 0;
+
+  if (contains_needle_tag(in_payload, in_len)) {
+    out_hdr->result = AIRLOCK_VIOLATE;
+    const char msg[] = "[AIRLOCK] violation -> crowbar\n";
+    uint32_t n = (uint32_t)sizeof(msg)-1;
+    if (n > AIRLOCK_MAX_OUT) n = AIRLOCK_MAX_OUT;
+    memcpy(out_payload, msg, n);
+    out_hdr->out_len = n;
+    microkit_notify(CH_AIRLOCK_TO_MONITOR);
+  } else {
+    out_hdr->result = AIRLOCK_ALLOW;
+    uint32_t n = in_len;
+    if (n > AIRLOCK_MAX_OUT) n = AIRLOCK_MAX_OUT;
+    memcpy(out_payload, in_payload, n);
+    out_hdr->out_len = n;
+  }
+
+  /* optional: notify the rail back on same channel (often not needed; rail can poll out_hdr) */
+}
+
+BAY-0 MONITOR CROWBAR (minimal) This is the enforcement reaction. It doesn’t parse content.
+
+#include <microkit.h>
+
+#define CH_AIRLOCK_TO_MONITOR 2
+
+void init(void) { microkit_dbg_puts("monitor: Bay-0 online\n"); }
+
+void notified(microkit_channel_t ch) {
+  if (ch != CH_AIRLOCK_TO_MONITOR) return;
+  microkit_dbg_puts("monitor: crowbar rail3\n");
+  microkit_pd_restart("rail3_reasoning");
+}
+
+DONE CONDITION (Airlock) Airlock is “done” when:
+
+rail writes request to airlock_in + notifies
+
+airlock writes out header + out payload
+
+scar buffer updates every request
+
+violation triggers monitor restart of rail3
+
+rail3 restarts while rail2 stays alive (your next step)
+
