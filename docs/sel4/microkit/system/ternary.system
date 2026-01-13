@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system>
+
+  <!-- Memory Regions -->
+  <memory_region name="vault_mem"   size="0x2000" />
+  <memory_region name="airlock_buf" size="0x2000" />
+  <memory_region name="audit_buf"   size="0x2000" />
+
+  <!-- Vault (State -1) -->
+  <protection_domain name="vault_pd" priority="300">
+    <program_image path="vault_proxy.elf" />
+  </protection_domain>
+
+  <!-- Airlock (State 0) -->
+  <protection_domain name="airlock_pd" priority="200">
+    <program_image path="airlock.elf" />
+    <map mr="vault_mem"   vaddr="0x30000000" perms="r"  cached="false" />
+    <map mr="airlock_buf" vaddr="0x40000000" perms="rw" cached="false" />
+    <map mr="audit_buf"   vaddr="0x50000000" perms="rw" cached="false" />
+  </protection_domain>
+
+  <!-- Untrusted Workload (State +1) -->
+  <protection_domain name="workload_pd" priority="100">
+    <program_image path="workload.elf" />
+    <map mr="airlock_buf" vaddr="0x40000000" perms="r" cached="false" />
+  </protection_domain>
+
+  <!-- Monitor / Crowbar -->
+  <protection_domain name="monitor_pd" priority="400">
+    <program_image path="monitor.elf" />
+  </protection_domain>
+
+  <!-- Channels -->
+  <channel>
+    <end pd="workload_pd" id="1"/>
+    <end pd="airlock_pd"  id="1"/>
+  </channel>
+
+  <channel>
+    <end pd="airlock_pd" id="2"/>
+    <end pd="monitor_pd" id="2"/>
+  </channel>
+
+</system>
