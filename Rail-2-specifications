@@ -1,0 +1,300 @@
+Below is a kernel-first, implementation-ready spec for Interface Rail (Rail-2).
+No philosophy, no AI, no apps. This is the display rail that never dies.
+
+
+Interface Rail (Rail-2) Specification
+
+Deterministic Display Plane with Zero-Flicker Isolation
+
+Purpose
+
+Interface Rail (Rail-2) is the isolated media/display execution domain responsible for driving the screen, audio out, and user-visible frame buffers.
+
+Its primary invariant:
+
+> Rail-2 must remain alive and visually stable while Rail-3 (Reasoning) is killed, reset, or reborn.
+
+
+
+This guarantees:
+
+No screen flicker during AI hinge cycles
+
+No UI blackout during crowbar events
+
+No “AI owns the display” coupling
+
+
+Rail-2 is untrusted, but persistent across Rail-3 resets.
+
+
+
+Trust & Lifetime Model
+
+Property	Rail-2
+
+Trust level	Untrusted
+Lifetime	Long-lived
+Killed on hinge	❌ No
+Killed on violation	❌ No
+Can kill other rails	❌ No
+Can access vault	❌ No
+
+
+Rail-2 is allowed to be compromised without compromising:
+
+identity
+
+invariants
+
+reasoning
+
+continuity
+
+
+If Rail-2 is compromised, the worst case is visual corruption, not authority loss.
+
+
+
+Responsibilities
+
+Rail-2 owns:
+
+Display controller MMIO
+
+GPU / display DMA setup
+
+Front/back buffer swapping
+
+Audio output (optional, same model)
+
+UI compositor if present (but not required)
+
+
+Rail-2 does not own:
+
+identity
+
+input policy
+
+reasoning
+
+prompts
+
+tokens
+
+secrets
+
+
+
+Memory Model
+
+MMIO Regions (Mapped Only to Rail-2)
+
+<memory_region name="display_regs"
+               physical_address="0x30000000"
+               size="0x10000"/>
+
+<memory_region name="gpu_regs"
+               physical_address="0x31000000"
+               size="0x20000"/>
+
+Frame Buffers
+
+Two models are supported.
+
+Model A — Static Double Buffer (Preferred)
+
+<memory_region name="fb_front"
+               physical_address="0x80000000"
+               size="0x800000"/>
+
+<memory_region name="fb_back"
+               physical_address="0x80800000"
+               size="0x800000"/>
+
+Mapped rw only to Rail-2.
+
+Model B — Capability-Granted Buffers (Advanced)
+
+Buffers allocated by Rail-2
+
+Read-only capability optionally granted to Rail-3 via Airlock
+
+Revoked automatically on hinge
+
+
+
+Zero-Flicker Guarantee (Critical)
+
+Rule:
+Rail-3 may never directly touch display registers or front buffer.
+
+Frame Ownership Rules
+
+Rail-2 owns scan-out
+
+Rail-2 controls vsync
+
+Rail-2 decides when a frame becomes visible
+
+Rail-3 can only submit render artifacts, never live buffers
+
+
+This ensures:
+
+If Rail-3 dies mid-frame → last good frame persists
+
+If Rail-3 is slow → UI stays responsive
+
+If Rail-3 is malicious → cannot flash or strobe screen
+
+
+
+Rail-2 ↔ Rail-3 Interaction
+
+All interaction is one-way and gated.
+
+Allowed Inputs from Rail-3
+
+Rendered frame blob (optional)
+
+Text tokens (already sanitized by Airlock)
+
+Cursor / caret position
+
+Minimal UI hints
+
+
+All must pass through Interface Airlock (State-0).
+
+Forbidden
+
+Direct MMIO access
+
+Direct buffer swap
+
+Interrupt injection
+
+Timing control
+
+
+Interface Airlock (State-0)
+
+Rail-2 uses a Media / Interface Airlock separate from the Reasoning Airlock.
+
+Interface Airlock Contract
+
+Input:
+
+Bounded render artifact (max size)
+
+Explicit format ID (RGBA, glyph atlas, etc.)
+
+
+Output:
+
+ACCEPT → artifact staged
+
+REDACT → partial render / placeholder
+
+DROP → artifact ignored
+
+
+Violation:
+
+Never crowbars Rail-2
+
+May revoke Rail-3 render capability
+
+
+Hinge Interaction
+
+What happens on a 500 ms hinge?
+
+Component	Action
+
+Rail-3	Killed + restarted
+Rail-2	Unaffected
+Display	Continues scanning last committed frame
+Cursor / UI	Stable
+User	No flicker
+
+
+Rail-2 does not reset unless:
+
+it crashes
+
+it violates its own MMIO contract
+
+the user powers off the device
+
+
+Minimal Rail-2 C Skeleton
+
+#include <microkit.h>
+#include <stdint.h>
+
+#define DISPLAY_REGS 0x30000000
+#define FB_FRONT     0x80000000
+#define FB_BACK      0x80800000
+
+static volatile uint32_t *disp = (volatile uint32_t *)DISPLAY_REGS;
+static volatile uint8_t  *fb_front = (volatile uint8_t *)FB_FRONT;
+static volatile uint8_t  *fb_back  = (volatile uint8_t *)FB_BACK;
+
+void init(void) {
+    microkit_dbg_puts("rail2: display online\n");
+
+    /* init display controller */
+    disp[0] = FB_FRONT;   // scanout base
+    disp[1] = 1;          // enable
+}
+
+void commit_frame(void) {
+    /* swap back → front */
+    disp[0] = FB_BACK;
+}
+
+void notified(microkit_channel_t ch) {
+    /* future: receive render artifact via airlock */
+}
+
+
+
+Why This Works (Mechanically)
+
+Rail-2 never depends on Rail-3
+
+Rail-3 never touches scan-out
+
+Hinge only kills reasoning
+
+Screen state is physically decoupled
+
+
+This is why:
+
+tokens can resume after reset
+
+UI never blinks
+
+users never feel the hinge
+
+
+End State
+
+With Rail-2 implemented:
+
+Rail-1 (sensors) → optional
+
+Rail-2 (interface) → stable
+
+Rail-3 (reasoning) → disposable
+
+Bay-0 → absolute authority
+
+Airlocks → only bridges
+
+
+At that point, replacing load_weights() with BitNet logic will produce visible tokens with zero flicker, even under continuous kill-and-rebirth.
