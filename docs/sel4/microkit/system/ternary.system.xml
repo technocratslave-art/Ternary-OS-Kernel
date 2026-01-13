@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system>
+  <!-- Shared memory region used as the “Airlock Buffer” -->
+  <memory_region name="airlock_buf" size="0x2000" />
+  <memory_region name="audit_buf"  size="0x2000" />
+
+  <protection_domain name="vault_pd">
+    <program_image path="components/vault_proxy/vault_proxy.elf" />
+  </protection_domain>
+
+  <protection_domain name="audit_pd">
+    <program_image path="components/audit_sink/audit_sink.elf" />
+  </protection_domain>
+
+  <protection_domain name="airlock_pd">
+    <program_image path="components/airlock/airlock.elf" />
+    <map mr="airlock_buf" vaddr="0x70000000" perms="rw" />
+    <map mr="audit_buf"  vaddr="0x70002000" perms="rw" />
+  </protection_domain>
+
+  <protection_domain name="workload_pd">
+    <program_image path="components/workload_demo/workload_demo.elf" />
+    <map mr="airlock_buf" vaddr="0x70000000" perms="rw" />
+  </protection_domain>
+
+  <!-- Channels: workload -> airlock -->
+  <channel>
+    <end pd="workload_pd" id="1" />
+    <end pd="airlock_pd"  id="1" />
+  </channel>
+
+  <!-- Channels: airlock -> vault -->
+  <channel>
+    <end pd="airlock_pd" id="2" />
+    <end pd="vault_pd"   id="2" />
+  </channel>
+
+  <!-- Channels: airlock -> audit -->
+  <channel>
+    <end pd="airlock_pd" id="3" />
+    <end pd="audit_pd"   id="3" />
+  </channel>
+</system>
